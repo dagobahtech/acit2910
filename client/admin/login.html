@@ -39,23 +39,48 @@
                     <h3 class="panel-title">Sign In</h3>
                 </div>
                 <div class="panel-body">
-                    <form>
+
                         <div class="form-group">
-                            <input class="form-control" type="text" placeholder="Username" name="username" autofocus>
+                            <input id="usernameInput" class="form-control" type="text" placeholder="Username" name="username" autofocus>
                         </div>
                         <div class="form-group">
-                            <input class="form-control" type="password" placeholder="Password" name="password">
+                            <input id="passwordInput" class="form-control" type="password" placeholder="Password" name="password">
                         </div>
-                        <button class="btn btn-lg btn-success btn-block">Login</button>
+                        <button id="loginButton" class="btn btn-lg btn-success btn-block">Login</button>
                         <h2 class="text-center"><small>or</small></h2>
-                        <button class="btn btn-lg btn-default btn-block">Continue as a Guest</button>
-                    </form>
+                        <button type="submit" id="guestButton" class="btn btn-lg btn-default btn-block">Continue as a Guest</button>
+
                 </div>
             </div>
         </div>
     </div>
 </div>
 
+<script>
+
+    document.getElementById("loginButton").addEventListener("click", function() {
+        $.ajax({
+            url: "/login",
+            type: "POST",
+            data: {
+                username: document.getElementById("usernameInput").value,
+                password: document.getElementById("passwordInput").value
+            },
+            success: function(response) {
+
+                if(response.status === "success") {
+                    if(response.type === 1){
+                        location.href = "/admin"
+                    } else if (response.type === 2) {
+                        location.href = "/kitchen"
+                    }
+                } else {
+                    console.log(response.message);
+                }
+            }
+        });
+    });
+</script>
 
 </body>
 </html>

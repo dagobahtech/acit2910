@@ -25,19 +25,15 @@ const admin = require('./routes/admin');
 const dbURL = process.env.DATABASE_URL || "postgres://lpufbryv:FGc7GtCWBe6dyop0yJ2bu0pTXDoBJnEv@stampy.db.elephantsql.com:5432/lpufbryv";
 
 
-var publicFolder = path.resolve(__dirname, "client/view");
-
-var adminFolder = path.resolve(__dirname, "client/view/admin");
 var pFolder = path.resolve(__dirname, "client/public");
-
+var adminFolder = path.resolve(__dirname, "client/admin");
+var loginForm = path.resolve(__dirname, "client/admin/login.html");
 
 
 // redirect to css and js folders
 app.use("/scripts", express.static("client/buildjs"));
 app.use("/styles", express.static("client/stylesheet"));
 
-
-var adminFolder = path.resolve(__dirname, "client/admin");
 
 // redirect to image, css and js folders
 app.use("/scripts", express.static("client/build"));
@@ -57,23 +53,50 @@ app.use(session({
 //set the home folder to client/build
 app.use(express.static(path.join(__dirname, "client","/build")));
 
+app.get("/login", function (req, resp) {
+    resp.sendFile(loginForm);
+});
+
+app.post("/login", function (req, resp){
+
+    console.log(req.body);
+
+    pg.connect(dbURL, function (err, client, done) {
+        if(err){console.log(err)}
+        let dbQuery = "SELECT type_id FROM user_login WHERE username = $1 AND password = $2";
+        client.query(dbQuery, [req.body.username, req.body.password], function(err, result){
+            done();
+            if(err){console.log(err)}
+
+            console.log(result.rows[0]);
+            if(result.rows[0] !== undefined) {
+                req.session.user_id = result.rows[0].type_id;
+                resp.send({status: "success", message: "login successfully", type: req.session.user_id});
+            } else {
+                resp.send({status: "failed", message: "incorrect login"});
+            }
+        });
+    });
+});
+
 //Jed - kitchen testing client
 //@JED testing kitchen
 var kitchenFolder = path.resolve(__dirname, "client/kitchen-alt");
 app.get("/kitchen", function (req, resp) {
-    resp.sendFile(kitchenFolder+"/kitchen.html");
-} );
+    // console.log(req.session);
+    console.log(req.session.user_id);
+    if (req.session.user_id == 2) {
+        resp.sendFile(kitchenFolder + "/kitchen.html");
+    } else {
+        resp.sendFile(loginForm);
+    }
+});
 
 // orderview get ajax
 app.get("/orderview", function(req,resp) {
     resp.sendFile(pFolder+"/orderview.html");
 });
 
-
-app.use(express.static(path.join(__dirname, "client","/build")));
-
-
-app.post("/admin/createItem", function(req, resp) {});
 
 //setup the routes
 app.use("/admin", admin);
@@ -85,7 +108,6 @@ app.use("/admin", admin);
 //var menuArray = [];     //server array of menu items to be sent to client.
 var comboDiscount = 0.15;  //combo discount.  To be pulled from the database later on.
 
-console.log("menuArray should be empty: "+ dagobah.menuItems.length);
 function getMenuItems() {
     pg.connect(dbURL, function(err, client, done){
         if(err){
@@ -98,8 +120,6 @@ function getMenuItems() {
             });
     });
 }
-
-setTimeout(function() {console.log("menuArray after getMenuItems: " + dagobah.menuItems.length)}, 2000);
 
 exports.getMenuItems = getMenuItems(); // DL - export the function to be used in "/routes/admin.js"
 
@@ -360,4 +380,5 @@ server.listen(port, function(err){
     }
 
     console.log("Server is running on port " + port);
+    console.log("MR. Repo is watching you.");
 });

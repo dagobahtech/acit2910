@@ -6,9 +6,15 @@ var rootFile = require("../index.js");
 
 const dbURL = process.env.DATABASE_URL || "postgres://lpufbryv:FGc7GtCWBe6dyop0yJ2bu0pTXDoBJnEv@stampy.db.elephantsql.com:5432/lpufbryv";
 var adminFolder = path.resolve(__dirname, "../client/admin");
+var loginForm = path.resolve(__dirname, "../client/admin/login.html");
+
 
 router.get("/", function (req, resp) {
-    resp.sendFile(adminFolder + "/login.html");
+    if (req.session.user_id === 1) {
+        resp.sendFile(adminFolder + "/dashboard.html");
+    } else {
+        resp.sendFile(loginForm);
+    }
 });
 
 //temporary route to createitems
