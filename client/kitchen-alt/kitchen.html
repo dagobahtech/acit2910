@@ -7,6 +7,7 @@
 
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/css/bootstrap.min.css" integrity="sha384-rwoIResjU2yc3z8GV/NPeZWAv56rSmLldC3R/AZzGRnGxQQKnKkoFVhFQhNUwEyJ" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <style>
         .main{
             height: 100vh;
@@ -93,6 +94,23 @@
             padding: 2px;
         }
 
+        .nopadding {
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+
+        #status {
+            color: black;
+            font-size: large;
+            font-weight: bold;
+            padding: 5px;
+            display: none;
+        }
+
+        .selected .card-header {
+            background-color: green;
+            color: white;
+        }
         /*Scrollbar CSS*/
 
         ::-webkit-scrollbar {
@@ -122,17 +140,35 @@
 <div class="container-fluid main py-3">
     <div class="row h-100">
         <div class="col-md-8 col-lg-8">
-            <div class="card  view">
-                <div class="card-header">ORDERS</div>
-                <div class="card-block">
-                    <div class="container-fluid">
-                        <div class="row" id="order-list"></div>
+            <div class="container-fluid h-100 nopadding">
+                <div class="row h-75 nopadding">
+                    <div class="col-12 nopadding">
+                        <div class="card view">
+                            <div class="card-header">ORDERS</div>
+                            <div class="card-block">
+                                <div class="container-fluid">
+                                    <div class="row" id="order-list"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row h-25 nopadding">
+                    <div class="col-12 nopadding">
+                        <div class="card view">
+                            <div class="card-header">READY TO SERVE</div>
+                            <div class="card-block">
+                                <div class="container-fluid">
+                                    <div class="row" id="ready-list"></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
         <div class="col-md-4 col-lg-4">
-            <div class="container-fluid h-100">
+            <div class="container-fluid h-100 nopadding">
                 <div class="row h-75">
                     <div class="col-md-12">
                         <div class="card view">
@@ -151,7 +187,7 @@
                             </div>
                             <div class="card-footer cook-buttons">
                                 <div class="container-fluid">
-                                    <div class="row">
+                                    <div class="row" id="buttons">
                                         <div class="col-md-4">
                                             <button type="button" class="btn btn-success btn-block" id="cook1">PREP 1</button>
                                         </div>
@@ -160,9 +196,14 @@
                                         </div>
                                         <div class="col-md-4">
                                             <button type="button" class="btn btn-success btn-block" id="cook6">PREP 6</button>
-
                                         </div>
                                     </div>
+                                    <div class="row" id="status">
+                                        <div class="col-12">
+                                            PREPARATION IN PROGRESS <i class="fa fa-spinner fa-spin" style="font-size:24px"></i>
+                                        </div>
+                                    </div>
+
                                 </div>
                             </div>
                         </div>
@@ -192,17 +233,19 @@
 <script>
 
     const socket = io();
-    const UPDATE_FREQUENCY = 10000; //initially set to 10s. check discard every update frequency
+    const UPDATE_FREQUENCY = 2000; //initially set to 10s. check discard every update frequency
     const EXPIRE_TIME = 1; //in mins
     var orderList = document.getElementById("order-list");
     var orderListNodes = orderList.childNodes;
-
 
     var prepItemList = document.getElementById("prep-item-list");
     var activeItem; //pointer to the selected item
 
     var foodTrayList = document.getElementById("food-tray-list");
     var foodTrayListNodes = foodTrayList.childNodes;
+
+    var readyList = document.getElementById("ready-list");
+    var readyListNodes = readyList.childNodes;
 
     //buttons
     var cook1 = document.getElementById("cook1");
@@ -213,16 +256,25 @@
     socket.emit("join","kitchen");
     //get all the orders
     socket.emit("get all orders");
+    //check the cooking status
+    socket.emit("status");
     //populate the order list
     socket.on("orders", updateAll);
-    //listener when something is discarded
+    //listener when something is discarded or served
     socket.on("update", function (view, data) {
         if(view === "order") {
             updateOrders(data);
-        } else {
+        } else if (view === "foodtray"){
             updateFoodTray(data);
+        } else if (view === "ready") {
+            updateReady(data);
         }
     } );
+    
+    socket.on("status", showStatus);
+
+    //preserve the button style
+    const buttonStyle = document.getElementById("buttons").style;
 
     //check the foods every 10s
     setInterval(checkFoods, UPDATE_FREQUENCY);
@@ -242,18 +294,23 @@
 
     function cook(quantity) {
         if(activeItem) {
+            showStatus(true);
             socket.emit("cook", {id: parseInt(activeItem.itemId, 10), name: activeItem.itemName}, quantity);
+            activeItem = undefined;
+            resetHighlight();
         }
     }
 
     /* Orders CRUD*/
     //CREATING
+    /*ORDER LIST*/
     function addOrders(orders) {
 
         orders.forEach(function (order, index) {
             addOrderCard(order, index);
         } )
     }
+
     function addOrderCard(order, index) {
         orderList.appendChild(createOrderCard(order, index));
     }
@@ -287,6 +344,7 @@
         return container;
     }
 
+
     function createItemList(items, index) {
 
         let itemList = document.createElement("ul");
@@ -317,6 +375,7 @@
         return itemList;
     }
 
+    /*FOODTRAY LIST*/
     function createFoodTrayItem(food, index) {
 
         var container = document.createElement("div");
@@ -337,16 +396,48 @@
         return container;
     }
 
-
     function populateFoodTray(foodTray) {
         foodTray.forEach(function (food, index) {
             foodTrayList.appendChild(createFoodTrayItem(food, index));
         })
     }
 
+    function createReadyItem(order, index) {
+
+        let container = document.createElement("div");
+        let orderNumber = document.createElement("span");
+        let serveButton = document.createElement("button");
+
+        container.className = "col-6 col-md-2 py-1 px-0";
+        orderNumber.innerHTML = "Order #" + order._orderNumber;
+        orderNumber.style.paddingLeft = "5px";
+        serveButton.innerHTML = "SERVE";
+        serveButton.className = "btn btn-success btn-sm";
+
+        serveButton.addEventListener("click", function () {
+            socket.emit("serve", this.parentNode.index);
+        });
+
+        container.appendChild(serveButton);
+        container.appendChild(orderNumber);
+
+        container.index = index;
+        container.order = order;
+
+        return container;
+    }
+
+    function addReadyOrders(orders) {
+        orders.forEach(function (order, index) {
+            readyList.append(createReadyItem(order, index));
+        } )
+    }
+
     //UPDATING
-    function updateAll(orders, foodTray) {
+    function updateAll(orders, readyOrders, foodTray) {
+        console.log(foodTray);
         updateOrders(orders);
+        updateReady(readyOrders);
         updateFoodTray(foodTray);
     }
 
@@ -357,6 +448,10 @@
         populatePrepList();
     }
 
+    function updateReady(orders) {
+        readyList.innerHTML = "";
+        addReadyOrders(orders);
+    }
     function updateFoodTray(foodTray) {
         foodTrayList.innerHTML = "";
         populateFoodTray(foodTray);
@@ -399,12 +494,15 @@
     //DELETING
 
 
+    /*PREPARATIONS LIST*/
     /*
-    * POPULATING PREPARATION ITEMS*/
+     * POPULATING PREPARATION ITEMS*/
     function populatePrepList() {
         let items = getUniqueItemsAsDict();
+        console.log("items");
         console.log(items);
-        for(let itemId in items){
+        items.forEach(function (item) {
+            console.log(item);
             let row = document.createElement("tr");
             let dataCellName = document.createElement("td");
             let dataCellQty = document.createElement("td");
@@ -415,13 +513,14 @@
             dataCellQty.className = "col-md-1";
             dataCellOrders.className = "col-md-5";
 
-            row.itemId = itemId;
-            row.itemName = items[itemId].name;
-            dataCellName.innerHTML = items[itemId].name;
-            dataCellQty.innerHTML = items[itemId].quantity;
+            row.itemId = item.itemId;
+            row.itemName = item.name;
+            row.inOrders = item.inOrders;
+            dataCellName.innerHTML = item.name;
+            dataCellQty.innerHTML = item.quantity;
 
-            items[itemId].inOrders.forEach(function (orderId) {
-                dataCellOrders.innerHTML += " #"+orderId;
+            item.inOrders.forEach(function (orderInfo) {
+                dataCellOrders.innerHTML += " #"+orderInfo.order+"["+orderInfo.qty+"]";
             } );
 
             row.appendChild(dataCellName);
@@ -429,8 +528,8 @@
             row.appendChild(dataCellOrders);
 
             //if item is in the current order.. emphasize it
-            console.log(items[itemId].inOrders);
-            if(items[itemId].inOrders.includes(orderListNodes[0].order._orderNumber)) {
+            console.log(item.inOrders);
+            if(inOrderContainsOrder(item.inOrders, orderListNodes[0].order._orderNumber) !== -1) {
                 console.log(orderListNodes[0].order._orderNumber);
                 row.className += " current";
             }
@@ -441,15 +540,16 @@
                 }
                 this.classList.add("active-item");
                 activeItem = this;
+                highligthOrders(this.inOrders);
             });
 
             prepItemList.appendChild(row);
-        }
+        })
     }
 
 
     function getUniqueItemsAsDict() {
-        let result = {};
+        let result = [];
         for(let x = 0 ; x < orderListNodes.length ; x++) {
             let order = orderListNodes[x].order;
             let items = order._items._items;
@@ -457,18 +557,32 @@
             items.forEach(function (item) {
                 if(!item._isDone) {
 
-                    if (typeof(result[item._id]) === 'undefined') {
-                        result[item._id] = {
+//                    if (typeof(result[item._id]) === 'undefined') {
+//                        result[item._id] = {
+//                            name: item._name,
+//                            quantity: 1,
+//                            inOrders: [{order: order._orderNumber, qty: 1}]
+//                        }
+//                    }
+                    let itemIndex = itemIndexInOrders(item._id, result);
+                    if(itemIndex === -1) {
+                        result.push({
+                            itemId: item._id,
                             name: item._name,
                             quantity: 1,
-                            inOrders: [order._orderNumber]
-                        }
+                            inOrders: [{order: order._orderNumber, qty: 1}]
+                        });
                     } else {
 
-                        result[item._id].quantity += 1;
-                        console.log("item already done");
-                        if (!(order._orderNumber in result[item._id].inOrders)) {
-                            result[item._id].inOrders.push(order._orderNumber);
+                        result[itemIndex].quantity += 1;
+
+                        let index = inOrderContainsOrder(result[itemIndex].inOrders, order._orderNumber);
+
+                        //does not contain the order number
+                        if(index === -1) {
+                            result[itemIndex].inOrders.push({order: order._orderNumber, qty: 1})
+                        } else {
+                            result[itemIndex].inOrders[index].qty += 1;
                         }
 
                     }
@@ -477,6 +591,26 @@
         }
 
         return result
+    }
+
+    function inOrderContainsOrder(inOrders, orderNumber) {
+        for(let x = 0 ; x < inOrders.length ; x++) {
+            if(inOrders[x].order === orderNumber){
+                return x;
+            }
+        }
+        return -1;
+    }
+
+    function itemIndexInOrders(itemId, list) {
+        for(let x = 0 ; x < list.length ; x++) {
+            let item = list[x];
+            if(item.itemId === itemId) {
+                return x;
+            }
+        }
+
+        return -1;
     }
 
     /*HELPER FUNCTIONS*/
@@ -494,6 +628,49 @@
         });
     }
 
+    function showStatus(shouldShow) {
+
+        var status = document.getElementById("status");
+        var buttons = document.getElementById("buttons");
+        console.log(buttons.style.display);
+        if(shouldShow) {
+            buttons.style.display = "none";
+            status.style.display = "block";
+        } else {
+            buttons.style = buttonStyle;
+            status.style.display = "none";
+        }
+    }
+
+    function highligthOrders(orderInfoList) {
+        console.log("highlight orders");
+        for(let y = 0 ; y < orderListNodes.length ; y++) {
+
+            let orderContainer = orderListNodes[y];
+            let orderCard = orderContainer.childNodes[0];
+            let found = false;
+            for(let x = 0 ; x < orderInfoList.length ; x++) {
+                if(orderInfoList[x].order === orderContainer.order._orderNumber) {
+                    found = true;
+                    break;
+                }
+            }
+            if(found)
+            {
+                orderCard.classList.add("selected");
+            } else {
+                orderCard.classList.remove("selected");
+            }
+        }
+
+    }
+
+    function resetHighlight() {
+
+        for(let x = 0 ; x < orderListNodes.length ; x++) {
+            orderListNodes[x].classList.remove("selected");
+        }
+    }
 </script>
 
 <!-- jQuery first, then Tether, then Bootstrap JS. -->

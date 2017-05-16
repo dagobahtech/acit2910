@@ -16,7 +16,7 @@ class Kitchen {
          this._orderQueue = new OrderQueue();
          this._foodTray = new FoodTray();
          this._orderNumber = 0;
-         this.COOK_DELAY = 1000; //in milliseconds. set for 1 for now. change in the future
+         this.COOK_DELAY = 5000; //in milliseconds. set for 1 for now. change in the future
     }
 
     get orderQueue() {
@@ -137,6 +137,10 @@ class Kitchen {
         this.printOrderQueue();
         this.printFoodTray();
         this.printReadyQueue();
+    }
+
+    serve(index) {
+        this._readyQueue.removeAtIndex(index);
     }
 
     //TODO discards
