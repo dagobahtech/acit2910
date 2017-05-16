@@ -1,11 +1,13 @@
 module.exports = {
-    'Login test': function (client) {
-        client
-            .url('http://localhost:3000/')
-            .setValue('input[name="username"]', 'admin')
+    'Login test': function (browser) {
+        browser
+            .url('localhost:3000/login')
+            .waitForElementVisible('body', 1000)
+            .setValue('input[name="username"]', 'kitchen')
             .setValue('input[name="password"]', 'dagobahtech')
             .click('button[type="submit"]')
-            .assert.containsText('main', 'Kitchen')
+            .pause(2000)
+            .assert.title('Kitchen')
             .end();
     }
-}
+};
