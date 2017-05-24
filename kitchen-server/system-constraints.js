@@ -2,21 +2,30 @@
  * Created by Brett Dixon on 2017-05-22.
  */
 'use-strict';
-const PropertiesReader = require('properties-reader');
 const file = './kitchen-server/sys-constraints.ini';
-var properties = PropertiesReader(file);
 
+const fs = require('fs')
+const ini = require('ini');
+
+var properties = ini.parse(fs.readFileSync(file, 'utf-8'));
 
 class SysConstraints {
 
     constructor() {
-        var properties = PropertiesReader(file);
-        this._comboDiscount = properties.get('main.comboDiscount');
-        this._cookTime = properties.get('main.cookTime');
-        this._maxOrders = properties.get('main.maxOrders');
-        this._maxPerItem = properties.get('main.maxPerItem');
-        this._discardTime = properties.get('main.discardTime');
-        this._numConstrains = properties.length;
+        this._comboDiscount = properties.main.comboDiscount;
+        this._cookTime = properties.main.cookTime;
+        this._maxOrders = properties.main.maxOrders;
+        this._maxPerItem = properties.main.maxPerItem;
+        this._maxItemPerOrder = properties.main.maxItemPerOrder;
+        this._discardTime = properties.main.discardTime;
+    }
+
+    get maxItemPerOrder() {
+        return this._maxItemPerOrder;
+    }
+
+    set maxItemPerOrder(value) {
+        this._maxItemPerOrder = properties.main.maxItemPerOrder = value;
     }
 
     get comboDiscount() {
@@ -24,8 +33,7 @@ class SysConstraints {
     }
 
     set comboDiscount(value) {
-        properties.set('main.comboDiscount', value);
-        this._comboDiscount = properties.get('main.comboDiscount');
+        this._comboDiscount = properties.main.comboDiscount = value;
     }
 
     get cookTime() {
@@ -33,8 +41,7 @@ class SysConstraints {
     }
 
     set cookTime(value) {
-        properties.set('main.cookTime', value);
-        this._cookTime = properties.get('main.cookTime');
+        this._cookTime = properties.main.cookTime = value;
     }
 
     get maxOrders() {
@@ -42,8 +49,7 @@ class SysConstraints {
     }
 
     set maxOrders(value) {
-        properties.set('main.maxOrders', value);
-        this._maxOrders = properties.get('main.maxOrders');
+        this._maxOrders = properties.main.maxOrders = value;
     }
 
     get maxPerItem() {
@@ -51,8 +57,7 @@ class SysConstraints {
     }
 
     set maxPerItem(value) {
-        properties.set('main.maxPerItem', value);
-        this._maxPerItem = properties.get('main.maxPerItem');
+        this._maxPerItem = properties.main.maxPerItem = value;
     }
 
     get discardTime() {
@@ -60,14 +65,12 @@ class SysConstraints {
     }
 
     set discardTime(value) {
-        properties.set('main.discardTime', value);
-        this._discardTime = properties.get('main.discardTime');
+        this._discardTime = properties.main.discardTime = value;
     }
 
-    get numConstrains() {
-        return this._numConstrains;
+    writeToFile() {
+        fs.writeFileSync(file, ini.stringify(properties))
     }
-
 }
 
 module.exports = SysConstraints;
